@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ระบบเช็คยอดสั่งซื้อลูกค้า</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#F4F6F1;--cd:#fff;--ink:#16241B;--mu:#5C6B60;--ln:#DDE3D8;--ac:#1F6B3A;--wn:#8A3A12;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101712;--cd:#19231C;--ink:#E8EEE9;--mu:#9DAEA2;--ln:#2A3A2F;--ac:#6FCF97;--wn:#F0A27A;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#101712;--cd:#19231C;--ink:#E8EEE9;--mu:#9DAEA2;--ln:#2A3A2F;--ac:#6FCF97;--wn:#F0A27A;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans Thai",system-ui,sans-serif;font-size:15px;line-height:1.5}
+#app{max-width:480px;margin:0 auto;min-height:100vh}
+header{background:#1F6B3A;color:#fff;padding:18px 20px 16px}
+header h1{margin:0;font-size:22px;font-weight:700}
+header p{margin:4px 0 0;font-size:14px}
+header .sm{font-size:12px;opacity:.9}
+header a{color:#fff;text-decoration:none;display:inline-block;min-height:32px}
+main{padding:14px;display:flex;flex-direction:column;gap:10px}
+h2{margin:8px 0 0;font-size:15px;color:var(--mu)}
+input[type=search]{min-height:46px;border:1px solid var(--ln);border-radius:10px;padding:0 14px;font:inherit;background:var(--cd);color:var(--ink);width:100%;box-sizing:border-box}
+.cd{display:block;background:var(--cd);border:1px solid var(--ln);border-radius:12px;padding:14px;color:inherit;text-decoration:none}
+.r{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.mu{color:var(--mu);font-size:13px}
+.ac{color:var(--ac)}
+.wn{color:var(--wn);font-size:13px;margin:6px 0 0}
+.ch{display:flex;gap:8px;flex-wrap:wrap}
+.ch button{min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--ln);background:var(--cd);color:var(--ink);font:inherit;cursor:pointer}
+.ch button.on{background:#1F6B3A;border-color:#1F6B3A;color:#fff;font-weight:600}
+.bt{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:10px;border:0;background:#1F6B3A;color:#fff;font:inherit;font-weight:600;text-decoration:none;cursor:pointer;box-sizing:border-box}
+.bt.o{background:transparent;border:1px solid var(--ac);color:var(--ac)}
+.ac2,.ft{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.ft button{min-height:44px;border:0;background:none;color:var(--mu);font:inherit;cursor:pointer}
+.st{display:flex;gap:10px}.st .cd{flex:1;padding:12px}.st b{display:block;font-size:16px}
+details.cd{padding:0}
+summary{display:flex;justify-content:space-between;align-items:center;min-height:48px;padding:0 14px;cursor:pointer}
+.ln{display:flex;justify-content:space-between;gap:10px;padding:10px 14px;border-top:1px solid var(--ln)}
+.ln>b{white-space:nowrap}
+:focus-visible{outline:3px solid #E3A008;outline-offset:2px}
+[hidden]{display:none!important}
+button.tg{text-align:left;font:inherit;color:inherit;cursor:pointer;min-height:44px}
+.hb{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.6);color:#fff;border-radius:10px;min-height:44px;padding:0 14px;font:inherit;margin-top:8px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=n=>(+n||0).toLocaleString('th-TH',{maximumFractionDigits:0});
+const fmt2=n=>(+n||0).toLocaleString('th-TH',{maximumFractionDigits:2});
+const MO=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const lab=k=>k?(MO[k%100-1]||'')+' '+Math.floor(k/100):'ไม่ทราบเดือน';
+let D=null,P={},sort='net',q='';
+function rd(k){try{const x=localStorage.getItem(k);return x?JSON.parse(x):null}catch(e){return null}}
+function wr(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function rm(k){try{localStorage.removeItem(k)}catch(e){}}
+function ym(so){const m=/^SR-(\d{2})(\d{2})/.exec(so);return m?(2500+ +m[1])*100+ +m[2]:0}
+function fin(s){s.ord=Object.values(s.orders).sort((a,b)=>b.ym-a.ym||(a.so<b.so?1:-1));delete s.orders;s.net=0;s.gross=0;s.disc=0;s.ord.forEach(o=>o.lines.forEach(l=>{s.net+=l.n;s.gross+=l.g;s.disc+=l.d}));s.last=s.ord.length?s.ord[0].ym:0;return s}
+function parse(rows){
+  const shops=[];let cur=null,total=null;
+  for(const r of rows){
+    if(r[0]==='ร้านค้า'){cur={name:String(r[1]||'').trim(),orders:{}};shops.push(cur)}
+    else if(r[0]==='รวมยอดพนักงาน'){total=r.filter(x=>typeof x==='number').pop()}
+    else if(cur&&typeof r[3]==='string'&&r[3].startsWith('SR-')){
+      const o=cur.orders[r[3]]||(cur.orders[r[3]]={so:r[3],ym:ym(r[3]),lines:[]});
+      o.lines.push({p:String(r[0]).trim(),k:String(r[7]||'').trim().replace(/\s+/g,' '),q:+r[9]||0,f:+r[10]||0,u:r[11]||'',gr:String(r[18]||'').trim(),np:+r[13]||0,g:+r[14]||0,d:+r[17]||0,n:+r[20]||0});
+    }
+  }
+  const s=shops.filter(x=>Object.keys(x.orders).length).map(fin);
+  const net=s.reduce((a,x)=>a+x.net,0);
+  return{shops:s,net,warn:total!=null&&Math.abs(net-total)>1};
+}
+async function load(f){
+  try{
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:null});
+    const d=parse(rows);if(!d.shops.length)throw 0;
+    d.file=f.name;d.at=Date.now();D=d;wr('sot:data',d);location.hash='';view();
+  }catch(e){empty('อ่านไฟล์ไม่ได้ ตรวจสอบว่าเป็นไฟล์ “รายงานสรุปยอดขาย แยกตามลูกค้า” ที่ส่งออกจากโปรแกรมบัญชี')}
+}
+const upl=t=>`<label class="bt o">${t}<input type="file" id="f" accept=".xls,.xlsx" hidden></label>`;
+function empty(msg){
+  $('#app').innerHTML=`<header><h1>ลูกค้าของฉัน</h1><p>ดูร้านค้า ยอดสั่งซื้อ และราคา จากรายงานยอดขาย</p></header><main><div class="cd"><b>เริ่มต้นใช้งาน</b><p class="mu">อัปโหลดไฟล์ “รายงานสรุปยอดขาย แยกตามลูกค้า” (.xls) จากโปรแกรมบัญชี ข้อมูลจะถูกอ่านและเก็บไว้ในเครื่องนี้เท่านั้น</p>${upl('เลือกไฟล์รายงาน')}${msg?`<p class="wn">${msg}</p>`:''}</div></main>`;
+}
+function items(){
+  const k=q.trim().toLowerCase();
+  let a=D.shops.map((s,i)=>({s,i,hit:null}));
+  if(k)a=a.filter(x=>{if(x.s.name.toLowerCase().includes(k))return true;for(const o of x.s.ord)for(const l of o.lines)if(l.p.toLowerCase().includes(k)){x.hit=l.p;return true}return false});
+  a.sort(sort==='name'?(x,y)=>x.s.name.localeCompare(y.s.name,'th'):sort==='new'?(x,y)=>y.s.last-x.s.last||y.s.net-x.s.net:(x,y)=>y.s.net-x.s.net);
+  $('#items').innerHTML=a.length?a.map(x=>`<a class="cd" href="#store-${x.i}"><div class="r"><b>${esc(x.s.name)}</b><b class="ac">฿ ${fmt(x.s.net)}</b></div><div class="mu">${x.s.ord.length} ใบ SO · ล่าสุด ${lab(x.s.last)}${P[x.s.name]?' · มีพิกัดแล้ว':''}</div>${x.hit?`<div class="mu">มีสินค้า: ${esc(x.hit)}</div>`:''}</a>`).join(''):'<p class="mu">ไม่พบร้านหรือสินค้าที่ค้นหา</p>';
+}
+function list(){
+  const s=D.shops,n=s.reduce((a,x)=>a+x.ord.length,0);
+  $('#app').innerHTML=`<header><h1>ลูกค้าของฉัน</h1><p>${s.length} ร้าน · ${n} ใบ SO</p><button class="hb" data-a="grp" aria-expanded="true">ยอดสุทธิ ฿ ${fmt(D.net)} · แตะดูแยกกลุ่ม</button><p class="sm">ไฟล์ ${esc(D.file)} · อัปโหลด ${new Date(D.at).toLocaleDateString('th-TH',{dateStyle:'medium'})}</p>${D.warn?'<p class="sm">ยอดรวมจากรายการไม่ตรงกับท้ายรายงาน ควรตรวจสอบไฟล์อีกครั้ง</p>':''}</header><main>${gbox(D.shops.flatMap(x=>x.ord.flatMap(o=>o.lines)),D.net)}<input id="q" type="search" aria-label="ค้นหาร้านหรือสินค้า" placeholder="ค้นหาชื่อร้าน หรือชื่อสินค้า" value="${esc(q)}"><div class="ch">${[['net','ยอดสูงสุด'],['new','ล่าสุด'],['name','ชื่อ ก-ฮ']].map(([v,t])=>`<button data-a="sort" data-v="${v}" class="${sort===v?'on':''}">${t}</button>`).join('')}</div><div id="items" style="display:flex;flex-direction:column;gap:10px"></div><div class="ft">${upl('อัปโหลดไฟล์ใหม่')}<button data-a="clr">ลบข้อมูลในเครื่อง</button></div></main>`;
+  items();
+}
+function gbox(ls,tot){
+  const m={};ls.forEach(l=>{const k=l.gr||'ไม่ระบุ';m[k]=(m[k]||0)+l.n});
+  const a=Object.entries(m).sort((x,y)=>y[1]-x[1]);
+  return `<div class="cd gb"><b>ยอดซื้อแยกตามกลุ่ม</b>${a.length===1&&a[0][0]==='ไม่ระบุ'?'<p class="wn">ยังไม่มีข้อมูลกลุ่มในข้อมูลที่เก็บไว้ กรุณาอัปโหลดไฟล์รายงานใหม่อีกครั้ง</p>':''}${a.map(([k,v])=>`<div class="ln" style="padding:8px 0"><span>${k==='ไม่ระบุ'?k:'กลุ่ม '+esc(k)}</span><span><b>฿ ${fmt(v)}</b> <span class="mu">${tot?Math.round(v/tot*100):0}%</span></span></div>`).join('')}</div>`;
+}
+function store(i){
+  const s=D.shops[i],p=P[s.name],g={};
+  s.ord.forEach(o=>(g[o.ym]=g[o.ym]||[]).push(o));
+  const body=Object.keys(g).map(Number).sort((a,b)=>b-a).map(k=>`<h2>${lab(k)}</h2>`+g[k].map(o=>{const t=o.lines.reduce((a,l)=>a+l.n,0);return `<details class="cd"><summary><span>${esc(o.so)}</span><b>฿ ${fmt(t)}</b></summary>${o.lines.map(l=>`<div class="ln"><div><b>${esc(l.p)}</b><div class="mu">${esc(l.k)} · ${l.q} ${esc(l.u)}${l.f?` (แถม ${l.f})`:''} · ฿ ${fmt2(l.np)}/ชิ้น${l.d?` · ลด ฿ ${fmt(l.d)}`:''}</div></div><b>฿ ${fmt(l.n)}</b></div>`).join('')}</details>`}).join('')).join('');
+  $('#app').innerHTML=`<header><a href="#home">‹ ลูกค้าของฉัน</a><h1>${esc(s.name)}</h1></header><main><div class="st"><button class="cd tg" data-a="grp" aria-expanded="true"><span class="mu">ยอดสุทธิ</span><b class="ac">฿ ${fmt(s.net)}</b><span class="mu" style="font-size:12px">แตะดูแยกกลุ่ม</span></button><div class="cd"><span class="mu">ส่วนลดรวม</span><b>฿ ${fmt(s.disc)}</b></div><div class="cd"><span class="mu">ใบ SO</span><b>${s.ord.length}</b></div></div>${gbox(s.ord.flatMap(o=>o.lines),s.net)}<div class="cd"><b>ที่ตั้งร้าน</b>${p?`<p class="mu" style="margin:4px 0 0">พิกัด ${p.lat}, ${p.lng}</p>`:'<p class="mu" style="margin:4px 0 0">ยังไม่มีพิกัดของร้านนี้ ไปที่หน้าร้านแล้วกดบันทึก</p>'}<div class="ac2">${p?`<a class="bt" href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}" target="_blank" rel="noopener">นำทาง</a>`:''}<button class="bt o" data-a="pin">${p?'อัปเดตพิกัดที่นี่':'บันทึกพิกัดที่นี่'}</button></div><p id="pm" class="wn"></p></div>${body}</main>`;
+}
+function view(){
+  if(!D)return empty();
+  const m=/^#store-(\d+)$/.exec(location.hash);
+  m&&D.shops[+m[1]]?store(+m[1]):list();
+}
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-a]');if(!t)return;const a=t.dataset.a;
+  if(a==='sort'){sort=t.dataset.v;view()}
+  else if(a==='grp'){const b=$('.gb');b.hidden=!b.hidden;t.setAttribute('aria-expanded',String(!b.hidden))}
+  else if(a==='clr'){t.textContent='แตะอีกครั้งเพื่อลบข้อมูลทั้งหมด (รวมพิกัด)';t.dataset.a='clr2'}
+  else if(a==='clr2'){rm('sot:data');rm('sot:pins');D=null;P={};q='';view()}
+  else if(a==='pin'){
+    const s=D.shops[+/\d+/.exec(location.hash)];
+    if(!navigator.geolocation){$('#pm').textContent='อุปกรณ์นี้ไม่รองรับการอ่านตำแหน่ง';return}
+    $('#pm').textContent='กำลังอ่านตำแหน่ง...';
+    navigator.geolocation.getCurrentPosition(pos=>{P[s.name]={lat:+pos.coords.latitude.toFixed(6),lng:+pos.coords.longitude.toFixed(6)};wr('sot:pins',P);view()},()=>{$('#pm').textContent='อ่านตำแหน่งไม่ได้ ตรวจสอบว่าอนุญาตให้เบราว์เซอร์ใช้ตำแหน่งแล้ว'},{enableHighAccuracy:true,timeout:15000});
+  }
+});
+document.addEventListener('input',e=>{if(e.target.id==='q'){q=e.target.value;items()}});
+document.addEventListener('change',e=>{if(e.target.id==='f'&&e.target.files[0])load(e.target.files[0])});
+addEventListener('hashchange',()=>{view();scrollTo(0,0)});
+D=rd('sot:data');P=rd('sot:pins')||{};view();
+</script>
+</body>
+</html>

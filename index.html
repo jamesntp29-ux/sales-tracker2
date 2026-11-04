@@ -31,6 +31,7 @@ input[type=search]{min-height:46px;border:1px solid var(--ln);border-radius:10px
 .ch button.on{background:#1F6B3A;border-color:#1F6B3A;color:#fff;font-weight:600}
 .bt{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:10px;border:0;background:#1F6B3A;color:#fff;font:inherit;font-weight:600;text-decoration:none;cursor:pointer;box-sizing:border-box}
 .bt.o{background:transparent;border:1px solid var(--ac);color:var(--ac)}
+.bt:disabled{opacity:.4;cursor:default}
 .ac2,.ft{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
 .ft button{min-height:44px;border:0;background:none;color:var(--mu);font:inherit;cursor:pointer}
 .st{display:flex;gap:10px}.st .cd{flex:1;padding:12px}.st b{display:block;font-size:16px}
@@ -40,6 +41,21 @@ summary{display:flex;justify-content:space-between;align-items:center;min-height
 .ln>b{white-space:nowrap}
 :focus-visible{outline:3px solid #E3A008;outline-offset:2px}
 [hidden]{display:none!important}
+.tb{gap:0;flex-wrap:nowrap;background:var(--cd);border:1px solid var(--ln);border-radius:12px;padding:4px}
+.tab{flex:1;display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:9px;color:var(--ink);text-decoration:none;font-weight:600}
+.tab.on{background:#1F6B3A;color:#fff}
+.ms{flex-wrap:nowrap;overflow-x:auto}.ms button{white-space:nowrap;flex:none}
+.rk{display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--ln);margin-top:8px}.rn{width:18px;text-align:center}
+summary,.tg,.hb{position:relative}
+summary{list-style:none;padding:0 40px 0 14px}
+summary::-webkit-details-marker{display:none}
+summary::after,.tg::after,.hb::after{content:"";position:absolute;right:14px;top:50%;width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-70%) rotate(45deg);transition:transform .15s;opacity:.7}
+details[open]>summary::after,[aria-expanded="true"]::after{transform:translateY(-30%) rotate(-135deg)}
+.tg::after{top:18px;right:12px}
+
+
+.hb::after{display:none}
+.hb{padding-right:16px}
 button.tg{text-align:left;font:inherit;color:inherit;cursor:pointer;min-height:44px}
 .hb{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.6);color:#fff;border-radius:10px;min-height:44px;padding:0 14px;font:inherit;margin-top:8px;cursor:pointer}
 </style>
@@ -53,69 +69,101 @@ const fmt=n=>(+n||0).toLocaleString('th-TH',{maximumFractionDigits:0});
 const fmt2=n=>(+n||0).toLocaleString('th-TH',{maximumFractionDigits:2});
 const MO=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const lab=k=>k?(MO[k%100-1]||'')+' '+Math.floor(k/100):'ไม่ทราบเดือน';
-let D=null,P={},sort='net',q='';
+let D=null,P={},sort='net',q='',pg=0,mo=0,more=false;
 function rd(k){try{const x=localStorage.getItem(k);return x?JSON.parse(x):null}catch(e){return null}}
 function wr(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 function rm(k){try{localStorage.removeItem(k)}catch(e){}}
 function ym(so){const m=/^SR-(\d{2})(\d{2})/.exec(so);return m?(2500+ +m[1])*100+ +m[2]:0}
-function fin(s){s.ord=Object.values(s.orders).sort((a,b)=>b.ym-a.ym||(a.so<b.so?1:-1));delete s.orders;s.net=0;s.gross=0;s.disc=0;s.ord.forEach(o=>o.lines.forEach(l=>{s.net+=l.n;s.gross+=l.g;s.disc+=l.d}));s.last=s.ord.length?s.ord[0].ym:0;return s}
+function fin(s){s.ord=Object.values(s.orders).sort((a,b)=>b.ym-a.ym||(a.so<b.so?1:-1));delete s.orders;s.net=0;s.gross=0;s.disc=0;s.ad=0;s.sr=0;s.ord.forEach(o=>o.lines.forEach(l=>{s.net+=l.n;s.gross+=l.g;s.disc+=l.d;s.ad+=l.ad||0;s.sr+=l.sr||0}));s.last=s.ord.length?s.ord[0].ym:0;return s}
 function parse(rows){
   const shops=[];let cur=null,total=null;
   for(const r of rows){
-    if(r[0]==='ร้านค้า'){cur={name:String(r[1]||'').trim(),orders:{}};shops.push(cur)}
+    if(r[0]==='ร้านค้า'){cur={name:String(r[1]||'').trim().replace(/\s+/g,' '),orders:{}};shops.push(cur)}
     else if(r[0]==='รวมยอดพนักงาน'){total=r.filter(x=>typeof x==='number').pop()}
     else if(cur&&typeof r[3]==='string'&&r[3].startsWith('SR-')){
       const o=cur.orders[r[3]]||(cur.orders[r[3]]={so:r[3],ym:ym(r[3]),lines:[]});
-      o.lines.push({p:String(r[0]).trim(),k:String(r[7]||'').trim().replace(/\s+/g,' '),q:+r[9]||0,f:+r[10]||0,u:r[11]||'',gr:String(r[18]||'').trim(),np:+r[13]||0,g:+r[14]||0,d:+r[17]||0,n:+r[20]||0});
+      o.lines.push({p:String(r[0]).trim(),k:String(r[7]||'').trim().replace(/\s+/g,' '),q:+r[9]||0,f:+r[10]||0,u:r[11]||'',gr:String(r[18]||'').trim(),lp:+r[12]||0,ad:+r[15]||0,sr:+r[16]||0,np:+r[13]||0,g:+r[14]||0,d:+r[17]||0,n:+r[20]||0});
     }
   }
   const s=shops.filter(x=>Object.keys(x.orders).length).map(fin);
   const net=s.reduce((a,x)=>a+x.net,0);
-  return{shops:s,net,warn:total!=null&&Math.abs(net-total)>1};
+  return{shops:s,net,ad:s.reduce((a,x)=>a+x.ad,0),sr:s.reduce((a,x)=>a+x.sr,0),warn:total!=null&&Math.abs(net-total)>1};
 }
-async function load(f){
+function merge(a,b){
+  const m={};
+  [a,b].forEach(d=>d.shops.forEach(s=>{const t=m[s.name]||(m[s.name]={name:s.name,orders:{}});s.ord.forEach(o=>{t.orders[o.so]=o})}));
+  const shops=Object.values(m).map(fin);
+  return{shops,net:shops.reduce((x,s)=>x+s.net,0),ad:shops.reduce((x,s)=>x+s.ad,0),sr:shops.reduce((x,s)=>x+s.sr,0)};
+}
+const err=m=>{if(D){view();$('main').insertAdjacentHTML('afterbegin','<p class="wn">'+m+'</p>')}else empty(m)};
+async function load(fs,add){
   try{
-    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+    let base=add&&D?D:null,files=add&&D&&D.files?D.files.slice():[],warn=!!(add&&D&&D.warn);
+    for(const f of fs){const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
     const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:null});
-    const d=parse(rows);if(!d.shops.length)throw 0;
-    d.file=f.name;d.at=Date.now();D=d;wr('sot:data',d);location.hash='';view();
-  }catch(e){empty('อ่านไฟล์ไม่ได้ ตรวจสอบว่าเป็นไฟล์ “รายงานสรุปยอดขาย แยกตามลูกค้า” ที่ส่งออกจากโปรแกรมบัญชี')}
+    const d=parse(rows);if(!d.shops.length)throw 0;base=base?merge(base,d):d;warn=warn||d.warn;files.push({n:f.name,c:d.shops.length});}
+    base.files=files;base.warn=warn;base.at=Date.now();D=base;pg=0;wr('sot:data',D);location.hash='';view();
+  }catch(e){err('อ่านไฟล์ไม่ได้ ตรวจสอบว่าเป็นไฟล์ “รายงานสรุปยอดขาย แยกตามลูกค้า” ที่ส่งออกจากโปรแกรมบัญชี')}
 }
-const upl=t=>`<label class="bt o">${t}<input type="file" id="f" accept=".xls,.xlsx" hidden></label>`;
+const upl=(t,id)=>`<label class="bt o">${t}<input type="file" id="${id}" accept=".xls,.xlsx" multiple hidden></label>`;
 function empty(msg){
-  $('#app').innerHTML=`<header><h1>ลูกค้าของฉัน</h1><p>ดูร้านค้า ยอดสั่งซื้อ และราคา จากรายงานยอดขาย</p></header><main><div class="cd"><b>เริ่มต้นใช้งาน</b><p class="mu">อัปโหลดไฟล์ “รายงานสรุปยอดขาย แยกตามลูกค้า” (.xls) จากโปรแกรมบัญชี ข้อมูลจะถูกอ่านและเก็บไว้ในเครื่องนี้เท่านั้น</p>${upl('เลือกไฟล์รายงาน')}${msg?`<p class="wn">${msg}</p>`:''}</div></main>`;
+  $('#app').innerHTML=`<header><h1>ลูกค้าของฉัน</h1><p>ดูร้านค้า ยอดสั่งซื้อ และราคา จากรายงานยอดขาย</p></header><main><div class="cd"><b>เริ่มต้นใช้งาน</b><p class="mu">อัปโหลดไฟล์ “รายงานสรุปยอดขาย แยกตามลูกค้า” (.xls) จากโปรแกรมบัญชี ข้อมูลจะถูกอ่านและเก็บไว้ในเครื่องนี้เท่านั้น</p>${upl('เลือกไฟล์รายงาน (เลือกได้หลายไฟล์)','fa')}${msg?`<p class="wn">${msg}</p>`:''}</div></main>`;
 }
 function items(){
   const k=q.trim().toLowerCase();
   let a=D.shops.map((s,i)=>({s,i,hit:null}));
   if(k)a=a.filter(x=>{if(x.s.name.toLowerCase().includes(k))return true;for(const o of x.s.ord)for(const l of o.lines)if(l.p.toLowerCase().includes(k)){x.hit=l.p;return true}return false});
   a.sort(sort==='name'?(x,y)=>x.s.name.localeCompare(y.s.name,'th'):sort==='new'?(x,y)=>y.s.last-x.s.last||y.s.net-x.s.net:(x,y)=>y.s.net-x.s.net);
-  $('#items').innerHTML=a.length?a.map(x=>`<a class="cd" href="#store-${x.i}"><div class="r"><b>${esc(x.s.name)}</b><b class="ac">฿ ${fmt(x.s.net)}</b></div><div class="mu">${x.s.ord.length} ใบ SO · ล่าสุด ${lab(x.s.last)}${P[x.s.name]?' · มีพิกัดแล้ว':''}</div>${x.hit?`<div class="mu">มีสินค้า: ${esc(x.hit)}</div>`:''}</a>`).join(''):'<p class="mu">ไม่พบร้านหรือสินค้าที่ค้นหา</p>';
+  const N=15,tp=Math.max(1,Math.ceil(a.length/N));if(pg>=tp)pg=tp-1;const pager=tp>1?`<div class="r"><button class="bt o" data-a="pg" data-v="-1"${pg===0?' disabled':''}>‹ ก่อนหน้า</button><span class="mu">หน้า ${pg+1} / ${tp}</span><button class="bt o" data-a="pg" data-v="1"${pg>=tp-1?' disabled':''}>ถัดไป ›</button></div>`:'';
+  $('#items').innerHTML=a.length?a.slice(pg*N,pg*N+N).map(x=>`<a class="cd" href="#store-${x.i}"><div class="r"><b>${esc(x.s.name)}</b><b class="ac">฿ ${fmt(x.s.net)}</b></div><div class="mu">${x.s.ord.length} ใบ SO · ล่าสุด ${lab(x.s.last)}${P[x.s.name]?' · มีพิกัดแล้ว':''}</div>${x.hit?`<div class="mu">มีสินค้า: ${esc(x.hit)}</div>`:''}</a>`).join('')+pager:'<p class="mu">ไม่พบร้านหรือสินค้าที่ค้นหา</p>';
 }
 function list(){
   const s=D.shops,n=s.reduce((a,x)=>a+x.ord.length,0);
-  $('#app').innerHTML=`<header><h1>ลูกค้าของฉัน</h1><p>${s.length} ร้าน · ${n} ใบ SO</p><button class="hb" data-a="grp" aria-expanded="true">ยอดสุทธิ ฿ ${fmt(D.net)} · แตะดูแยกกลุ่ม</button><p class="sm">ไฟล์ ${esc(D.file)} · อัปโหลด ${new Date(D.at).toLocaleDateString('th-TH',{dateStyle:'medium'})}</p>${D.warn?'<p class="sm">ยอดรวมจากรายการไม่ตรงกับท้ายรายงาน ควรตรวจสอบไฟล์อีกครั้ง</p>':''}</header><main>${gbox(D.shops.flatMap(x=>x.ord.flatMap(o=>o.lines)),D.net)}<input id="q" type="search" aria-label="ค้นหาร้านหรือสินค้า" placeholder="ค้นหาชื่อร้าน หรือชื่อสินค้า" value="${esc(q)}"><div class="ch">${[['net','ยอดสูงสุด'],['new','ล่าสุด'],['name','ชื่อ ก-ฮ']].map(([v,t])=>`<button data-a="sort" data-v="${v}" class="${sort===v?'on':''}">${t}</button>`).join('')}</div><div id="items" style="display:flex;flex-direction:column;gap:10px"></div><div class="ft">${upl('อัปโหลดไฟล์ใหม่')}<button data-a="clr">ลบข้อมูลในเครื่อง</button></div></main>`;
+  $('#app').innerHTML=`<header><h1>ลูกค้าของฉัน</h1><p>${s.length} ร้าน · ${n} ใบ SO</p><button class="hb" data-a="grp" aria-expanded="false">ยอดสุทธิ ฿ ${fmt(D.net)}</button><p class="sm">ส่วนลด AD ฿ ${fmt2(D.ad)} · SR ฿ ${fmt2(D.sr)}</p><p class="sm">${(D.files||[]).length||1} ไฟล์ · อัปโหลดล่าสุด ${new Date(D.at).toLocaleDateString('th-TH',{dateStyle:'medium'})}</p>${D.warn?'<p class="sm">ยอดรวมจากรายการไม่ตรงกับท้ายรายงาน ควรตรวจสอบไฟล์อีกครั้ง</p>':''}</header><main>${tabs('c')}${gbox(D.shops.flatMap(x=>x.ord.flatMap(o=>o.lines)),D.net)}<input id="q" type="search" aria-label="ค้นหาร้านหรือสินค้า" placeholder="ค้นหาชื่อร้าน หรือชื่อสินค้า" value="${esc(q)}"><div class="ch">${[['net','ยอดสูงสุด'],['new','ล่าสุด'],['name','ชื่อ ก-ฮ']].map(([v,t])=>`<button data-a="sort" data-v="${v}" class="${sort===v?'on':''}">${t}</button>`).join('')}</div><div id="items" style="display:flex;flex-direction:column;gap:10px"></div><p class="mu" style="margin:8px 0 0">ไฟล์ที่โหลดไว้: ${(D.files||[]).map(f=>esc(f.n)).join(', ')||'-'}</p><div class="ft">${upl('เพิ่มไฟล์','fa')}${upl('แทนที่ทั้งหมด','fr')}<button data-a="clr">ลบข้อมูลในเครื่อง</button></div></main>`;
   items();
 }
 function gbox(ls,tot){
   const m={};ls.forEach(l=>{const k=l.gr||'ไม่ระบุ';m[k]=(m[k]||0)+l.n});
   const a=Object.entries(m).sort((x,y)=>y[1]-x[1]);
-  return `<div class="cd gb"><b>ยอดซื้อแยกตามกลุ่ม</b>${a.length===1&&a[0][0]==='ไม่ระบุ'?'<p class="wn">ยังไม่มีข้อมูลกลุ่มในข้อมูลที่เก็บไว้ กรุณาอัปโหลดไฟล์รายงานใหม่อีกครั้ง</p>':''}${a.map(([k,v])=>`<div class="ln" style="padding:8px 0"><span>${k==='ไม่ระบุ'?k:'กลุ่ม '+esc(k)}</span><span><b>฿ ${fmt(v)}</b> <span class="mu">${tot?Math.round(v/tot*100):0}%</span></span></div>`).join('')}</div>`;
+  return `<div class="cd gb" hidden><b>ยอดซื้อแยกตามกลุ่ม</b>${a.length===1&&a[0][0]==='ไม่ระบุ'?'<p class="wn">ยังไม่มีข้อมูลกลุ่มในข้อมูลที่เก็บไว้ กรุณาอัปโหลดไฟล์รายงานใหม่อีกครั้ง</p>':''}${a.map(([k,v])=>`<div class="ln" style="padding:8px 0"><span>${k==='ไม่ระบุ'?k:'กลุ่ม '+esc(k)}</span><span><b>฿ ${fmt(v)}</b> <span class="mu">${tot?Math.round(v/tot*100):0}%</span></span></div>`).join('')}</div>`;
 }
 function store(i){
   const s=D.shops[i],p=P[s.name],g={};
   s.ord.forEach(o=>(g[o.ym]=g[o.ym]||[]).push(o));
-  const body=Object.keys(g).map(Number).sort((a,b)=>b-a).map(k=>`<h2>${lab(k)}</h2>`+g[k].map(o=>{const t=o.lines.reduce((a,l)=>a+l.n,0);return `<details class="cd"><summary><span>${esc(o.so)}</span><b>฿ ${fmt(t)}</b></summary>${o.lines.map(l=>`<div class="ln"><div><b>${esc(l.p)}</b><div class="mu">${esc(l.k)} · ${l.q} ${esc(l.u)}${l.f?` (แถม ${l.f})`:''} · ฿ ${fmt2(l.np)}/ชิ้น${l.d?` · ลด ฿ ${fmt(l.d)}`:''}</div></div><b>฿ ${fmt(l.n)}</b></div>`).join('')}</details>`}).join('')).join('');
-  $('#app').innerHTML=`<header><a href="#home">‹ ลูกค้าของฉัน</a><h1>${esc(s.name)}</h1></header><main><div class="st"><button class="cd tg" data-a="grp" aria-expanded="true"><span class="mu">ยอดสุทธิ</span><b class="ac">฿ ${fmt(s.net)}</b><span class="mu" style="font-size:12px">แตะดูแยกกลุ่ม</span></button><div class="cd"><span class="mu">ส่วนลดรวม</span><b>฿ ${fmt(s.disc)}</b></div><div class="cd"><span class="mu">ใบ SO</span><b>${s.ord.length}</b></div></div>${gbox(s.ord.flatMap(o=>o.lines),s.net)}<div class="cd"><b>ที่ตั้งร้าน</b>${p?`<p class="mu" style="margin:4px 0 0">พิกัด ${p.lat}, ${p.lng}</p>`:'<p class="mu" style="margin:4px 0 0">ยังไม่มีพิกัดของร้านนี้ ไปที่หน้าร้านแล้วกดบันทึก</p>'}<div class="ac2">${p?`<a class="bt" href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}" target="_blank" rel="noopener">นำทาง</a>`:''}<button class="bt o" data-a="pin">${p?'อัปเดตพิกัดที่นี่':'บันทึกพิกัดที่นี่'}</button></div><p id="pm" class="wn"></p></div>${body}</main>`;
+  const body=Object.keys(g).map(Number).sort((a,b)=>b-a).map(k=>`<h2>${lab(k)}</h2>`+g[k].map(o=>{const t=o.lines.reduce((a,l)=>a+l.n,0);return `<details class="cd"><summary><span>${esc(o.so)}</span><b>฿ ${fmt(t)}</b></summary>${o.lines.map(l=>`<div class="ln"><div><b>${esc(l.p)}</b><div class="mu">${esc(l.k)} · ${l.q} ${esc(l.u)}${l.f?` (แถม ${l.f})`:''} · ฿ ${fmt2(l.lp||l.np)}/ชิ้น</div></div><b>฿ ${fmt(l.n)}</b></div>`).join('')}</details>`}).join('')).join('');
+  $('#app').innerHTML=`<header><a href="#home">‹ ลูกค้าของฉัน</a><h1>${esc(s.name)}</h1></header><main><div class="st"><button class="cd tg" data-a="grp" aria-expanded="false"><span class="mu">ยอดสุทธิ</span><b class="ac">฿ ${fmt(s.net)}</b><span class="mu" style="font-size:12px">แตะดูแยกกลุ่ม</span></button><div class="cd"><span class="mu">ส่วนลดรวม</span><b>฿ ${fmt(s.disc)}</b></div><div class="cd"><span class="mu">ใบ SO</span><b>${s.ord.length}</b></div></div><div class="st"><div class="cd"><span class="mu">AD</span><b>฿ ${fmt2(s.ad)}</b></div><div class="cd"><span class="mu">SR</span><b>฿ ${fmt2(s.sr)}</b></div></div>${gbox(s.ord.flatMap(o=>o.lines),s.net)}<div class="cd"><b>ที่ตั้งร้าน</b>${p?`<p class="mu" style="margin:4px 0 0">พิกัด ${p.lat}, ${p.lng}</p>`:'<p class="mu" style="margin:4px 0 0">ยังไม่มีพิกัดของร้านนี้ บันทึกตอนอยู่หน้าร้าน หรือใส่พิกัดเอง</p>'}<div class="ac2">${p?`<a class="bt" href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}" target="_blank" rel="noopener">นำทาง</a>`:''}<button class="bt o" data-a="pin">${p?'อัปเดตพิกัดที่นี่':'บันทึกพิกัดที่นี่'}</button></div><details style="margin-top:6px"><summary class="mu" style="padding:0">ใส่พิกัดเอง (ไม่ต้องไปที่ร้าน)</summary><div class="ac2"><input id="ll" aria-label="พิกัดร้าน" placeholder="เช่น 13.7563, 100.5018" style="flex:1;min-width:0;min-height:46px;border:1px solid var(--ln);border-radius:10px;padding:0 12px;font:inherit;background:var(--cd);color:var(--ink)"><button class="bt" data-a="man">บันทึก</button></div><p class="mu" style="margin:6px 0 0">ใน Google Maps แตะค้างที่ตำแหน่งร้าน แล้วคัดลอกตัวเลขพิกัดมาวาง หรือวางลิงก์แบบเต็มที่มีตัวเลขพิกัดอยู่หลังเครื่องหมาย @</p></details><p id="pm" class="wn"></p></div>${body}</main>`;
+}
+const tabs=a=>`<nav class="ch tb"><a class="tab${a==='c'?' on':''}" href="#home">ลูกค้า</a><a class="tab${a==='m'?' on':''}" href="#month">สรุปรายเดือน</a></nav>`;
+function month(){
+  const ks=[...new Set(D.shops.flatMap(s=>s.ord.map(o=>o.ym)))].sort((a,b)=>b-a);
+  if(!ks.includes(mo))mo=ks[0];
+  const pr={},sh=[];let tot=0,so=0;
+  D.shops.forEach((s,i)=>{let n=0,c=0;s.ord.forEach(o=>{if(o.ym!==mo)return;c++;o.lines.forEach(l=>{n+=l.n;const p=pr[l.p]||(pr[l.p]={n:0,q:0,u:l.u});p.n+=l.n;p.q+=l.q})});if(c){sh.push({i,n,c});tot+=n;so+=c}});
+  const L=more?10:5;
+  const ps=Object.entries(pr).sort((a,b)=>b[1].n-a[1].n).slice(0,L);
+  sh.sort((a,b)=>b.n-a.n);
+  const row=(i,t,d,v)=>`<div class="rk"><span class="mu rn">${i+1}</span><div style="flex:1;min-width:0"><b>${t}</b><div class="mu">${d}</div></div><b class="ac">฿ ${fmt(v)}</b></div>`;
+  $('#app').innerHTML=`<header><h1>สรุปรายเดือน</h1><p>${lab(mo)} · ยอดสุทธิ ฿ ${fmt(tot)} · ${sh.length} ร้าน · ${so} ใบ SO</p></header><main>${tabs('m')}<div class="ch ms">${ks.map(k=>`<button data-a="mo" data-v="${k}" class="${k===mo?'on':''}">${lab(k)}</button>`).join('')}</div><div class="cd"><b>สินค้าขายดี</b>${ps.map(([n,p],i)=>row(i,esc(n),`${fmt(p.q)} ${esc(p.u)}`,p.n)).join('')}</div><div class="cd"><b>ร้านที่ซื้อมากที่สุด</b>${sh.slice(0,L).map((x,i)=>`<a href="#store-${x.i}" style="color:inherit;text-decoration:none;display:block">${row(i,esc(D.shops[x.i].name),`${x.c} ใบ SO`,x.n)}</a>`).join('')}</div><button class="bt o" data-a="more">${more?'แสดงแค่ 5 อันดับ':'ดูเพิ่มเป็น 10 อันดับ'}</button></main>`;
 }
 function view(){
   if(!D)return empty();
+  if(location.hash==='#month')return month();
   const m=/^#store-(\d+)$/.exec(location.hash);
   m&&D.shops[+m[1]]?store(+m[1]):list();
 }
 document.addEventListener('click',e=>{
   const t=e.target.closest('[data-a]');if(!t)return;const a=t.dataset.a;
-  if(a==='sort'){sort=t.dataset.v;view()}
+  if(a==='sort'){sort=t.dataset.v;pg=0;view()}
+  else if(a==='pg'){pg+=+t.dataset.v;items();$('#items').scrollIntoView()}
+  else if(a==='mo'){mo=+t.dataset.v;month()}
+  else if(a==='more'){more=!more;month()}
+  else if(a==='man'){
+    const s=D.shops[+/\d+/.exec(location.hash)],v=($('#ll').value||'').trim();
+    const m=/@(-?\d+\.\d+),(-?\d+\.\d+)/.exec(v)||/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/.exec(v)||/(-?\d{1,2}\.\d+)\s*[,\s]\s*(-?\d{1,3}\.\d+)/.exec(v);
+    const la=m&&+m[1],ln=m&&+m[2];
+    if(!m||Math.abs(la)>90||Math.abs(ln)>180){$('#pm').textContent='อ่านพิกัดไม่ได้ ลองวางตัวเลขแบบ 13.7563, 100.5018';return}
+    P[s.name]={lat:+la.toFixed(6),lng:+ln.toFixed(6)};wr('sot:pins',P);view();
+  }
   else if(a==='grp'){const b=$('.gb');b.hidden=!b.hidden;t.setAttribute('aria-expanded',String(!b.hidden))}
   else if(a==='clr'){t.textContent='แตะอีกครั้งเพื่อลบข้อมูลทั้งหมด (รวมพิกัด)';t.dataset.a='clr2'}
   else if(a==='clr2'){rm('sot:data');rm('sot:pins');D=null;P={};q='';view()}
@@ -126,8 +174,8 @@ document.addEventListener('click',e=>{
     navigator.geolocation.getCurrentPosition(pos=>{P[s.name]={lat:+pos.coords.latitude.toFixed(6),lng:+pos.coords.longitude.toFixed(6)};wr('sot:pins',P);view()},()=>{$('#pm').textContent='อ่านตำแหน่งไม่ได้ ตรวจสอบว่าอนุญาตให้เบราว์เซอร์ใช้ตำแหน่งแล้ว'},{enableHighAccuracy:true,timeout:15000});
   }
 });
-document.addEventListener('input',e=>{if(e.target.id==='q'){q=e.target.value;items()}});
-document.addEventListener('change',e=>{if(e.target.id==='f'&&e.target.files[0])load(e.target.files[0])});
+document.addEventListener('input',e=>{if(e.target.id==='q'){q=e.target.value;pg=0;items()}});
+document.addEventListener('change',e=>{const t=e.target;if((t.id==='fa'||t.id==='fr')&&t.files.length)load(Array.from(t.files),t.id==='fa')});
 addEventListener('hashchange',()=>{view();scrollTo(0,0)});
 D=rd('sot:data');P=rd('sot:pins')||{};view();
 </script>
